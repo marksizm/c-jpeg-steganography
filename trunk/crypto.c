@@ -1,3 +1,22 @@
+/**	
+ * Copyright 2010 Ivan Zelinskiy
+ * 
+ * This file is part of C-jpeg-steganography.
+ *
+ * C-jpeg-steganography is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * C-jpeg-steganography is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with C-jpeg-steganography.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "crypto.h"
 #include <string.h>
 #include <stdio.h>
@@ -22,9 +41,8 @@ void cipher(unsigned char * data, size_t len, const char * password, int directi
 	ivec[7] = 0x63;/* taken by fair use of /dev/random */
 	BF_KEY key;
 	BF_set_key(&key, strlen(password), password);
-	size_t nblocks = len / CIPHER_BLOCK_SIZE;
-	fprintf(stderr, "FIXME! change cipher batch in crypto.c\n");
-	long cipher_batch =  16*CIPHER_BLOCK_SIZE; /* 131072 */
+	size_t nblocks = len / CIPHER_BLOCK_SIZE;	
+	long cipher_batch =  16*1024*CIPHER_BLOCK_SIZE; /* 128 Kb of data to cipher at one time */
 	unsigned char buf[cipher_batch];
 	size_t unciphered, last_pack;
 	for( unciphered = 0; unciphered < nblocks * CIPHER_BLOCK_SIZE; unciphered += last_pack ){
