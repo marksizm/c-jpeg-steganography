@@ -1,0 +1,20 @@
+This program has been tested on Linux (x86 and x86_64). This shall compile OK on other UNIX-es, however.
+
+It depends on 'libssl >= 0.9.8' and 'libjpeg >= 62'.
+
+To compile run:
+1)make
+All shall be OK.
+
+After compiling you may run a test:
+1)./utility --read out.jpeg "password" | less
+Shall produce some hello world text in less console. The text is hidden in photo with "password" string as secret. In addition, some statistics will appear on stderr.
+
+The smaller your message is, the better it is hidden.
+
+Utility supports three actions:
+1)--write - embed message, taken from stdin
+2)--read - retrieve message from file, specified
+3)--estimate - print jpeg file statistics with available storage space among them. 
+
+
