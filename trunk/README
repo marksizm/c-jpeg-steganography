@@ -7,7 +7,7 @@ To compile run:
 All shall be OK.
 
 After compiling you may run a test:
-1)./utility --read out.jpeg "password" | less
+1)./utility --read out.jpeg "password"
 Shall produce some hello world text in less console. The text is hidden in photo with "password" string as secret. In addition, some statistics will appear on stderr.
 
 The smaller your message is, the better it is hidden.

@@ -1,6 +1,6 @@
-/**	
- * Copyright 2010 Ivan Zelinskiy
- * 
+/**
+ * Copyright 2011 Ivan Zelinskiy
+ *
  * This file is part of C-jpeg-steganography.
  *
  * C-jpeg-steganography is free software: you can redistribute it and/or modify
@@ -22,7 +22,7 @@
 #include "steganolab.h"
 #include <limits.h>
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 
 /**
  * This is the main c file of steganolab project. It compiles to a
@@ -33,7 +33,7 @@
 
 
 /**
- * Reads from stdin until there is no more data.
+ * Reads from descriptor until there is no more data.
  * Pushes back a pointer to malloced patch of memory with length of
  * useful data in the buffer. The buffer dealocation is up to the user.
  *
@@ -158,6 +158,26 @@ int read_password_from_fd(int fd, char ** password){
 }
 
 
+
+struct cleanup {
+	SLFILE * infile;
+	SLFILE * outfile;
+	char * password;
+};
+
+static void cleanup_init(struct cleanup * clu){
+	clu -> infile = NULL;
+	clu -> outfile = NULL;
+	clu -> password = NULL;
+}
+
+static void cleanup_do(struct cleanup * clu){
+	if( clu->infile != NULL ) fclose( clu->infile );
+	if( clu->outfile != NULL ) fclose( clu->outfile );
+	free( clu -> password );
+}
+
+
 #define DCT_RADIUS	2
 #define SECRET_FD	4
 
@@ -177,24 +197,36 @@ int main(int argc, char ** argv){
 
 	const char * cmd = argv[1];
 
+	struct cleanup clu; /* cleanup automation structure */
+	cleanup_init(&clu);
+
 	if( ! strcmp(cmd, "--write") ){
 		/*############################################################*/
 		if(! (argc == 4 || argc == 3) ){
 			return 100;
 		}
 		const char * filename = argv[2];
+		SLFILE * infile = fopen(filename, "r");
+		SLFILE * outfile = fopen("out.jpeg", "w");
+		clu.infile = infile;
+		clu.outfile = outfile;
+		if ( infile == NULL || outfile == NULL ){
+			fprintf(stderr, "Failed to open files\n");
+			cleanup_do(&clu);
+			return 101;
+		}
 		char * password;
-		char need_free_password;
 		if (argc == 4){
 			password = argv[3];
-			need_free_password = 0;
 		}else{/* We need to read password from FD */
 			int rv = read_password_from_fd(SECRET_FD, &password);
 			if(rv){
 				fprintf(stderr, "Failed to read password from FD %i\n", SECRET_FD);
-				return 101;
+				cleanup_do(&clu);
+				return 102;
 			}
-			need_free_password = 1;
+			/* remember for cleanup */
+			clu.password = password;
 		}
 		/* Reading data from stdin */
 		char * buf;
@@ -204,11 +236,11 @@ int main(int argc, char ** argv){
 		read_from_fd(&buf, &len, 0);
 		if(buf == NULL||len > UINT_MAX){
 			fprintf(stderr, "Can't read data from stdin\n");
-			if(need_free_password) free(password);
+			cleanup_do(&clu);
 			return 3;
 		}
 
-		int rv = steganolab_encode(filename, buf, (unsigned int)len, password, DCT_RADIUS, & stats);
+		int rv = steganolab_encode(infile, outfile, buf, (unsigned int)len, password, DCT_RADIUS, & stats);
 		free(buf);
 
 		if(rv){
@@ -219,31 +251,36 @@ int main(int argc, char ** argv){
 			steganolab_print_statistics( & stats, stderr );
 			steganolab_free_statistics( & stats );
 		}
-		if(need_free_password) free(password);
 	}else if( ! strcmp(cmd, "--read")){
 		/*############################################################*/
 		if( !(argc == 4||argc == 3) ){
 			return 200;
 		}
 		const char * filename = argv[2];
+		SLFILE * file = fopen(filename, "r");
+		if(file == NULL){
+			fprintf(stderr, "Can't open input file\n");
+			return 210;
+		}
+		clu.infile = file;
 		char * password;
-		char need_free_password;
 		if (argc == 4){
 			password = argv[3];
-			need_free_password = 0;
 		}else{/* We need to read password from FD */
 			int rv = read_password_from_fd(SECRET_FD, &password);
 			if(rv){
 				fprintf(stderr, "Failed to read password from FD %i\n", SECRET_FD);
+				cleanup_do(&clu);
 				return 201;
 			}
-			need_free_password = 1;
+			/* remember for cleanup */
+			clu.password = password;
 		}
 		char * buf;
 		unsigned int len;
 		struct steganolab_statistics stats;
 
-		int rv = steganolab_decode(filename, &buf, &len, password, DCT_RADIUS, & stats);
+		int rv = steganolab_decode(file, &buf, &len, password, DCT_RADIUS, & stats);
 		if(rv){
 			fprintf(stderr, "Decoder failed with message: %s\n", steganolab_describe(rv));
 			toreturn = 20;
@@ -257,12 +294,17 @@ int main(int argc, char ** argv){
 			fprintf(stderr, "Decoding OK, your message on stdout\n");
 			free(buf);
 		}
-		if(need_free_password) free(password);
 	}else if (! strcmp(cmd, "--estimate")){
 		if(argc != 3){
 			return 302;
 		}
-		const char * file = argv[2];
+		const char * filename = argv[2];
+		SLFILE * file = fopen(filename, "r");
+		if(file == NULL){
+			fprintf(stderr, "Can't open input file\n");
+			return 310;
+		}
+		clu.infile = file;
 		struct steganolab_statistics stats;
 		int rv = steganolab_estimate(file, DCT_RADIUS, & stats);
 		if(rv){
@@ -278,6 +320,7 @@ int main(int argc, char ** argv){
 		fprintf(stderr, "Wrong arguments\n");
 		return 2;
 	}
+	cleanup_do(&clu);
+
 	return toreturn;
 }
-
