@@ -1,5 +1,5 @@
 /**	
- * Copyright 2010 Ivan Zelinskiy
+ * Copyright 2011 Ivan Zelinskiy
  * 
  * This file is part of C-jpeg-steganography.
  *
@@ -20,7 +20,7 @@
 #ifndef LENCODE_H
 #define LENCODE_H
 #include <stdint.h>
-#include "malloc.h"
+#include <stdlib.h>
 /**
  * The module provides functions to read variable-length size records.
  * Such a record is a sequence of bytes: zero or more bytes with upper

@@ -1,5 +1,5 @@
 /**	
- * Copyright 2010 Ivan Zelinskiy
+ * Copyright 2011 Ivan Zelinskiy
  * 
  * This file is part of C-jpeg-steganography.
  *
@@ -19,12 +19,17 @@
 
 #ifndef STEGANOLAB_H
 #define STEGANOLAB_H
-#include <malloc.h>/* for size_t */
+#include <stddef.h>/* for size_t */
 #include <stdio.h>
 #include <stdint.h>
 /**
  * This module contains end-user steganographic functions
  */
+/* JPEG library is designed so that it's possible to redefine stdio 
+ * functions. Steganolab functions pass stream objects directly to 
+ * the underlying calls. If you hack jpeg library to use your custom 
+ * IO objects, define SLFILE type accordingly. */
+typedef FILE SLFILE;
 
 /**
  * This structure describes properties of jpeg color channel.
@@ -60,8 +65,9 @@ struct steganolab_statistics {
 
 
 /**
- * Modifies specified jpeg file so that it contains given message.
- * @param file - jpeg file name
+ * By given jpeg file writes another, that contains the hidden message.
+ * @param infile - input stream
+ * @param outfile - output stream
  * @param data - message to embed
  * @param len - message length
  * @param password - key string to cipher data and set up PRNG
@@ -74,13 +80,13 @@ struct steganolab_statistics {
  * @return		0: All OK
  * 				not 0: Failed
  **/
-int steganolab_encode(const char * file, const char * data,
-	unsigned int len, const char * password, uint8_t DCT_radius,
-	struct steganolab_statistics * stats);
+int steganolab_encode(SLFILE * infile, SLFILE * outfile, 
+	const char * data, unsigned int len, const char * password,
+	uint8_t DCT_radius, struct steganolab_statistics * stats);
 
 /**
- * Reads steganographic message from specified file
- * @param file - jpeg file name
+ * Reads steganographic message from stream
+ * @param file - jpeg stream
  * @param data - pointer to pointer to string to put data to
  * @param len - pointer to push obtained buffer length to
  * @param password - secred string for cipher and PRNG
@@ -92,7 +98,7 @@ int steganolab_encode(const char * file, const char * data,
  * @return	0: All OK
  * 			not 0: fail (no buffers need freeing in this case)
  */
-int steganolab_decode(const char * file, char ** data,
+int steganolab_decode(SLFILE * file, char ** data,
 	unsigned int * len, const char * password, uint8_t DCT_radius,
 	struct steganolab_statistics * stats);
 
@@ -100,7 +106,7 @@ int steganolab_decode(const char * file, char ** data,
 
 /**
  * Outputs jpeg file statistics.
- * @param file - jpeg file to study
+ * @param file - jpeg file stream to study
  * @param DCT_radius - DCT coefficient limitation
  * @param stats - statistics object to populate with data. NULL passed
  * to this parameter makes the whole function quite useless.
@@ -108,7 +114,7 @@ int steganolab_decode(const char * file, char ** data,
  * 			not 0	: an error occured, statistics object don't need to be
  * 			freed.
  */
-int steganolab_estimate(const char * file, uint8_t DCT_radius, struct
+int steganolab_estimate(SLFILE * file, uint8_t DCT_radius, struct
 	steganolab_statistics * stats);
 
 

@@ -1,5 +1,5 @@
 /**	
- * Copyright 2010 Ivan Zelinskiy
+ * Copyright 2011 Ivan Zelinskiy
  * 
  * This file is part of C-jpeg-steganography.
  *
@@ -19,7 +19,7 @@
 
 #include "steganolab.h"
 #include <stdio.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
 #include <setjmp.h>
@@ -317,41 +317,6 @@ my_error_exit (j_common_ptr cinfo){
 }
 
 
-/**
- * This structure holds pointers to objects, that need freeing.
- * There is a function that cals the needed freers, called
- * encode_cleanup_func, that calls proper functions.
- */
-struct cleanup {
-	/* These must be set to real objects before freeing */
-	struct jpeg_decompress_struct * cinfo;
-	FILE * infile;
-	struct enumerator * enu;
-	struct rgen * rge;
-	/* These may be set to NULL before setting pointing to real objects */
-	struct rsrce * rsrc;
-	unsigned char * message;
-	unsigned int * shuffle;
-	struct color_channel_info * cci;
-};
-
-static void cleanup_func(struct cleanup * o){
-	jpeg_destroy_decompress(o -> cinfo);
-	fclose(o -> infile);
-	enumerator_free(o -> enu);
-	/* Objects that can be NULL */
-	if ( o -> rge != NULL ){
-		rgen_free(o -> rge);
-	}
-	if( NULL != o -> rsrc ){
-		rsrce_free(o -> rsrc);
-	}
-	free(o -> message);
-	free(o -> shuffle);
-	free(o -> cci);
-}
-
-
 
 
 
@@ -359,20 +324,16 @@ static void cleanup_func(struct cleanup * o){
 /**
  * Writes a jpeg from specified context of other jpeg as it appears when
  * obtaining DCT coefficients and modifying them.
- * @param filename - to write new jpeg to
+ * @param file - io stream to write data to
  * @param cinfo_in - decompression context pointer
  * @param bvarr - DCT data array to write
  * @return 0 if OK, other values for errors
  */
-static int write_jpeg_by_other(const char * filename, j_decompress_ptr cinfo_in, jvirt_barray_ptr * bvarr){
+static int write_jpeg_by_other(SLFILE * file,
+	j_decompress_ptr cinfo_in, jvirt_barray_ptr * bvarr
+){
 	struct jpeg_compress_struct cinfo;/*compressor states*/
 	struct my_error_mgr jerr; /*error-handling structure*/
-	FILE *outfile;
-
-	outfile=fopen(filename, "w");
-	if(NULL==outfile){
-		return 2;/*Can't open file for writing*/
-	}
 
 	cinfo.err = jpeg_std_error(&jerr.pub);/*initialising default error handler
 											at jerr.pub*/
@@ -387,13 +348,12 @@ static int write_jpeg_by_other(const char * filename, j_decompress_ptr cinfo_in,
 		 * We need to clean up the JPEG object, close the input file, and return.
 		 */
 		jpeg_destroy_compress(&cinfo);
-		fclose(outfile);
 		return 10;
 	}
 
 	/*Initialising compression structure (cinfo.err given above)*/
 	jpeg_create_compress(&cinfo);
-	jpeg_stdio_dest(&cinfo, outfile);/*telling, where to put jpeg data*/
+	jpeg_stdio_dest(&cinfo, file);/*telling, where to put jpeg data*/
 
 	/* Applying parameters from source jpeg */
 	jpeg_copy_critical_parameters(cinfo_in, &cinfo);
@@ -403,7 +363,6 @@ static int write_jpeg_by_other(const char * filename, j_decompress_ptr cinfo_in,
 
 	/*clean-up*/
 	jpeg_finish_compress(&cinfo);
-	fclose(outfile);
 	jpeg_destroy_compress(&cinfo);
 	/*Done!*/
 	return 0;
@@ -475,6 +434,39 @@ static int read_steganographic_message_from_DCT_buffer(unsigned char * msg,
 
 
 
+/**
+ * This structure holds pointers to objects, that need freeing.
+ * There is a function that cals the needed freers, called
+ * encode_cleanup_func, that calls proper functions.
+ */
+struct cleanup {
+	/* These must be set to real objects before freeing */
+	struct jpeg_decompress_struct * cinfo;
+	struct enumerator * enu;
+	struct rgen * rge;
+	/* These may be set to NULL before setting pointing to real objects */
+	struct rsrce * rsrc;
+	unsigned char * message;
+	unsigned int * shuffle;
+	struct color_channel_info * cci;
+};
+
+static void cleanup_func(struct cleanup * o){
+	jpeg_destroy_decompress(o -> cinfo);
+	enumerator_free(o -> enu);
+	/* Objects that can be NULL */
+	if ( o -> rge != NULL ){
+		rgen_free(o -> rge);
+	}
+	if( NULL != o -> rsrc ){
+		rsrce_free(o -> rsrc);
+	}
+	free(o -> message);
+	free(o -> shuffle);
+	free(o -> cci);
+}
+
+
 
 #define DECODE		0
 #define ENCODE		1
@@ -483,7 +475,8 @@ static int read_steganographic_message_from_DCT_buffer(unsigned char * msg,
  * Worker function, that does embeding and reading upon request.
  * This function is convinient, because writer and reader share much of
  * similar code.
- * @param file - file name to work with
+ * @param infile - input file stream
+ * @param outfile - output file stream
  * @param data_in - message to embed if encoder
  * @param len_in - message length if encoder
  * @param data_out - pointer to pointer to push malloced buffer with
@@ -498,18 +491,14 @@ static int read_steganographic_message_from_DCT_buffer(unsigned char * msg,
  * @return 0 if OK, various error statuses on error, the statuses can be
  * decoded to human-readable from with the function providden
  */
-static int steganolab_worker(const char * file, const char * data_in,
-		unsigned int len_in, char ** data_out, unsigned int * len_out,
-		uint8_t action, const char * password, uint8_t DCT_radius,
-		struct steganolab_statistics * stats){
+static int steganolab_worker(SLFILE * infile, SLFILE * outfile, 
+	const char * data_in,
+	unsigned int len_in, char ** data_out, unsigned int * len_out,
+	uint8_t action, const char * password, uint8_t DCT_radius,
+	struct steganolab_statistics * stats
+){
 	struct jpeg_decompress_struct cinfo;
 	struct my_error_mgr jerr;
-
-	FILE * infile;
-
-	if ((infile = fopen(file, "r")) == NULL) {
-		return 1;
-	}
 
 	struct enumerator enu;/* Thing, able to explain where DCT coefficient is by it's id */
 	enumerator_init(&enu, DCT_radius);
@@ -520,7 +509,6 @@ static int steganolab_worker(const char * file, const char * data_in,
 
 	struct cleanup clu;
 	clu . cinfo = & cinfo;
-	clu . infile = infile;
 	clu . enu = & enu;
 	clu . rge = NULL;
 	clu . message = NULL;/* This will be set after, until this free(NULL) would work OK */
@@ -821,7 +809,7 @@ static int steganolab_worker(const char * file, const char * data_in,
 					message[bit_idx/8] & 1 << bit_idx % 8,
 					&rsrc );
 			}/* Done embeding */
-			int write_status = write_jpeg_by_other("out.jpeg", &cinfo, color_component_block_arrays);
+			int write_status = write_jpeg_by_other(outfile, &cinfo, color_component_block_arrays);
 			if(write_status){
 				cleanup_func( & clu );
 				return 30;
@@ -875,8 +863,6 @@ const char * steganolab_describe(int code){
 	switch(code){
 		case 0:
 			return "OK";
-		case 1:
-			return "Failed to open file";
 		case 2:
 			return "Jpeglib fail";
 		case 3:
@@ -895,21 +881,21 @@ const char * steganolab_describe(int code){
 
 
 
-int steganolab_encode(const char * file, const char * data,
+int steganolab_encode(SLFILE * infile, SLFILE * outfile, const char * data,
 		unsigned int len, const char * password, uint8_t DCT_radius,
 		struct steganolab_statistics * stats){
-	return steganolab_worker(file, data, (unsigned int)len, NULL, NULL, ENCODE, password, DCT_radius, stats);
+	return steganolab_worker(infile, outfile, data, (unsigned int)len, NULL, NULL, ENCODE, password, DCT_radius, stats);
 }
 
-int steganolab_decode(const char * file, char ** data,
+int steganolab_decode(SLFILE * file, char ** data,
 		unsigned int * len, const char * password, uint8_t DCT_radius,
 		struct steganolab_statistics * stats){
-	return steganolab_worker(file, NULL, 0, data, len, DECODE, password, DCT_radius, stats);
+	return steganolab_worker(file, NULL, NULL, 0, data, len, DECODE, password, DCT_radius, stats);
 }
 
-int steganolab_estimate(const char * file, uint8_t DCT_radius, struct
+int steganolab_estimate(SLFILE * file, uint8_t DCT_radius, struct
 		steganolab_statistics * stats){
-	return steganolab_worker(file, NULL, 0, NULL, NULL, ESTIMATE, NULL, DCT_radius, stats);
+	return steganolab_worker(file, NULL, NULL, 0, NULL, NULL, ESTIMATE, NULL, DCT_radius, stats);
 }
 
 /**

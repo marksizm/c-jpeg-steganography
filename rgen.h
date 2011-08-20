@@ -1,5 +1,5 @@
 /**	
- * Copyright 2010 Ivan Zelinskiy
+ * Copyright 2011 Ivan Zelinskiy
  * 
  * This file is part of C-jpeg-steganography.
  *
