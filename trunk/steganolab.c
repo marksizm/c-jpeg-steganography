@@ -269,7 +269,7 @@ static void embed_bit ( JCOEF * dctc, unsigned char bit, struct rsrce * random_s
 	assert(rbit != -1);/* OS radnom source fail */
 	char direction = rbit;/* C false - down, C true - up */
 	/* Ensuring that won't overflow we */
-	if( direction && * dctc == 32767 || ! direction && ! (* dctc == -32768) ){
+	if( direction && * dctc == 32767 || ! direction && * dctc == -32768 ){
 		direction = ! direction; /* dont'go there, go in the opposite direction * */
 	}
 
