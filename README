@@ -1,6 +1,6 @@
 This program has been tested on Linux (x86 and x86_64). This shall compile OK on other UNIX-es, however.
 
-It depends on 'libssl >= 0.9.8' and 'libjpeg >= 62'.
+It depends on 'libssl >= 1.0.0' and 'libjpeg >= 62'.
 
 To compile run:
 1)make
