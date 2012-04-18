@@ -75,10 +75,10 @@ struct steganolab_statistics {
  * 	information, i^2+j^2 <= R^2
  * @param stats - pointer to structure to put statistics to. The caller
  * must take care about freeing the structure properly. NULL pass
- * disables statistics output.  The object don't need to be freed if the
+ * disables statistics output.  The object doesn't need to be freed if the
  * function fails, and it contains no message.
- * @return		0: All OK
- * 				not 0: Failed
+ * @return 0: All OK
+ * not 0: Failed
  **/
 int steganolab_encode(SLFILE * infile, SLFILE * outfile, 
 	const char * data, unsigned int len, const char * password,
@@ -87,7 +87,7 @@ int steganolab_encode(SLFILE * infile, SLFILE * outfile,
 /**
  * Reads steganographic message from stream
  * @param file - jpeg stream
- * @param data - pointer to pointer to string to put data to
+ * @param data - pointer to pointer to buffer to put data to, needs to be free-d
  * @param len - pointer to push obtained buffer length to
  * @param password - secred string for cipher and PRNG
  * @param DCT_radius - which DCT coefficients shall be used to carry
@@ -95,8 +95,8 @@ int steganolab_encode(SLFILE * infile, SLFILE * outfile,
  * @param stats - statistics object. Free is up to the caller.
  * NULL disables the feature.  The object don't need to be freed if the
  * function fails, and it contains no message.
- * @return	0: All OK
- * 			not 0: fail (no buffers need freeing in this case)
+ * @return 0: All OK
+ * not 0: fail (no resources need to be freed in this case)
  */
 int steganolab_decode(SLFILE * file, char ** data,
 	unsigned int * len, const char * password, uint8_t DCT_radius,
@@ -110,9 +110,9 @@ int steganolab_decode(SLFILE * file, char ** data,
  * @param DCT_radius - DCT coefficient limitation
  * @param stats - statistics object to populate with data. NULL passed
  * to this parameter makes the whole function quite useless.
- * @return	0		: OK
- * 			not 0	: an error occured, statistics object don't need to be
- * 			freed.
+ * @return 0 : OK
+ * not 0 : an error occured, statistics object don't need to be
+ * freed.
  */
 int steganolab_estimate(SLFILE * file, uint8_t DCT_radius, struct
 	steganolab_statistics * stats);

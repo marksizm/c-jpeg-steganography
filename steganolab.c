@@ -541,6 +541,7 @@ static int steganolab_worker(SLFILE * infile, SLFILE * outfile,
 		cleanup_func(& clu);
 		return 20;/* Out of memory */
 	}
+	clu.cci = cci;
 	{/* Studying image */
 		int ksi;
 		for(ksi=0; ksi<color_channels; ksi+=1){
@@ -673,13 +674,14 @@ static int steganolab_worker(SLFILE * infile, SLFILE * outfile,
 			}
 			/* So we have needed number of bits in image */
 			/* How will parts of data be located ? */
-			unsigned int data_offset = record_length_big;
-			unsigned int sha1_offset = full_message_length - SHA_DIGEST_LENGTH;
-			if(sha1_offset <= data_offset ){
+			unsigned int data_offset = record_length_big;/* limited by maximum usable size of lencode record for the platform */
+			if(full_message_length <= data_offset + SHA_DIGEST_LENGTH ){
+				/* No space for SHA1 checksum and message */
 				/* No data can fit here! :P */
 				cleanup_func( & clu );
 				return 40;
 			}
+			unsigned int sha1_offset = full_message_length - SHA_DIGEST_LENGTH;
 			/* Allocating space for message */
 			unsigned char * message = malloc(full_message_length_after_fitting_to_blocks);
 			if(NULL == message){
